@@ -14,12 +14,10 @@
   $sadcolour = '#EE4D39';
   $totrequests = 0;
   date_default_timezone_set('Europe/Dublin');
-  //$refresh = (3600 - ((date("i") * 60) + date("s")));   
   function nicetime($date){
     if(empty($date)) return "No date provided";
-    $periods = array("sec", "min", "hr", "day", "wk", "mth", "yr", "dc");
-    $lengths = array("60","60","24","7","4.35","12","10");$now 
-    = time(); $unix_date = strtotime($date);
+    $periods = array("second", "minute", "hour", "day", "week", "month", "year", "decade");
+    $lengths = array("60","60","24","7","4.35","12","10");$now = time(); $unix_date = strtotime($date);
     if(empty($unix_date)) return "Bad date";    if($now > $unix_date) {$difference = $now - $unix_date;$tense = "ago";   
     } else {$difference = $unix_date - $now;$tense  = "from now";}
     for($j = 0; $difference >= $lengths[$j] && $j < count($lengths)-1; $j++)$difference /= $lengths[$j];
@@ -31,7 +29,6 @@
 ?>
 
 <html><head>
-<!--<META HTTP-EQUIV="Refresh" CONTENT="<?php echo $refresh; ?>">-->
 <meta property="fb:admins" content="1434685963"/>
 <meta property="og:site_name" content="Glass Rooms"/>
 <meta property="og:title" content="Glass Rooms Timetable"/>
@@ -73,9 +70,14 @@ tr { height: 35px !important; }
 tr { height: inherit !important; }
 .landscape {display:none !important;}
 }
-
+.studentshowmorelink {
+   cursor:hand;
+   cursor:pointer;
+}
+.studentshowmorelink:hover {
+   background-color:#EEEEEE;
+}
 </style>
-<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
 <script type="text/javascript">
 <!--
     function toggle_visibility_leader(id) {
@@ -92,6 +94,14 @@ tr { height: inherit !important; }
           e.style.display = 'block';
        }
     }
+    function toggle_visibility_reason(id) {
+       var e = document.getElementsByClassName(id);
+       for(var i=0; i<e.length; i++)
+          if(e[i].style.display == '')
+             e[i].style.display = 'none';
+          else
+             e[i].style.display = '';
+    }
     function toggle_visibility(id) {
        var e = document.getElementById(id);
        if(e.style.display == '')
@@ -100,19 +110,6 @@ tr { height: inherit !important; }
           e.style.display = '';
     }
 //-->
-</script>
-<script type="text/javascript">
-(function countdown(remaining) {
-    if (remaining === -1) {
-        var date = new Date();
-        remaining = 3600 - (date.getMinutes() * 60) - date.getSeconds() - 299;
-    }
-    if (remaining <= 0)
-       // location.reload(true);
-    setTimeout(function () {
-        countdown(remaining - 1);
-    }, 1000);
-})(-1);
 </script>
 <meta name="viewport" content="width=480; initial-scale=0.6666; maximum-scale=1.0; minimum-scale=0.6666" />
 
@@ -127,16 +124,20 @@ echo (function_exists('curl_version') ? "" : "<center><b><font color=\"red\">Sor
 function get_source($url, $month, $year){ 
 global $totrequests;
 $totrequests++;
+
 $ch = curl_init();$timeout = 5;curl_setopt($ch, CURLOPT_POST, 1);
+curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_POSTFIELDS, "Month=".$month."&Year=".$year."&Type=Small+Table");
 curl_setopt($ch,CURLOPT_URL,$url); curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
 curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout); $data = curl_exec($ch);
-curl_close($ch); return iconv("UTF-8","UTF-8//IGNORE", $data);
+if(curl_errno($ch)){echo "Error #".curl_errno($ch)." Occured";curl_close($ch);die();}
+curl_close($ch);return iconv("UTF-8","UTF-8//IGNORE", $data);
 }
 $tablestartcode = '<table border="1" bordercolor="#FFFFFF" style="border-color:#FFFFFF; background-color:#FFFFCC; table-layout: fixed; width: 100%; text-align:center;" cellpadding="3" cellspacing="0">';
 
 $array = array();
 $totalbookings = 0;
+
 // Counters
 $studentlist = array();
 $studentlistnum = 0;
@@ -209,7 +210,7 @@ for($x = 1; $x <= $monthstofetch; $x++){
         $courselist[$courselistnum++] = $currentcourse;
         $studentlist[$studentlistnum++] = $currentname."[".$currentcourse."]";
         $reasonlistppl[$reasonlistnum] = $currentname."[".$currentcourse."]";
-        $reasonlist[$reasonlistnum++] = preg_replace("~(.*) $~i", "$1", htmlspecialchars($arraytimes[$k][5]))."[".preg_replace("~(\d*) (\w*) (\d*)~i", "$2 $1, $3", $tempdate)."[".$arraytimes[$k][1].'-'.$arraytimes[$k][2]."]]";
+        $reasonlist[$reasonlistnum++] = preg_replace("~(.*) $~i", "$1", htmlspecialchars($arraytimes[$k][5]))."[".preg_replace("~(\d*) (\w*) (\d*)~i", "$2 $1, $3", $tempdate)."][".$arraytimes[$k][1].'-'.$arraytimes[$k][2]."][Room ".$i."]";
         $totalbookings++;
       }
     }
@@ -302,17 +303,17 @@ function leaderboard($name, $array, $count, $table, $totalbookings){
   <tr><td class="portrait" colspan="2" style="display:none;text-align:center;"><?php echo $headertext; ?></td><td class="landscape" colspan="<?php echo ($name == "Student" ? 4 : 3); ?>" style="text-align:center;"><?php echo $headertext; ?></td></tr>
   <?php $i = 1;
   foreach ($array as $key => $value) {
-      echo '<tr'.($name === "Student" ? " class=\"studenthover\"" : "").'><td class="landscape" style="width:25px;"><b>'.$i.'.</b></td><td'.($name == "Student" ? ' title="'.preg_replace("~.*\[(.*)\]~i", "$1", $key).'"' : '').'><b>'.preg_replace("~\[.*\]~i", "", $key).'</b></td><td title="'.round(($value / $totalbookings) * 100, 2).'%"><i><span class="portrait" style="display:none;">'.$value.'</span><span class="landscape">'.number_format($value).' Booking'.($value == 1 ? '' : 's').'</span></i> '.($i == 1 ? /*'<i><font color="#ff0000"> - Congratulations! You\'re a prick!</font></i>'*/'' : '').'</td>';
+      echo '<tr'.($name === "Student" ? " class=\"studenthover\"" : "").'><td class="landscape" style="width:25px;"><b>'.$i.'.</b></td><td'.($name == "Student" ? ' title="'.preg_replace("~.*\[(.*)\]~i", "$1", $key).'"' : '').'><b>'.preg_replace("~\[.*\]~i", "", $key).'</b></td><td title="'.round(($value / $totalbookings) * 100, 2).'% of '.number_format($totalbookings).' Bookings"><i><span class="portrait" style="display:none;">'.$value.'</span><span class="landscape">'.number_format($value).' Booking'.($value == 1 ? '' : 's').'</span></i> '.($i == 1 ? /*'<i><font color="#ff0000"> - Congratulations! You\'re a prick!</font></i>'*/'' : '').'</td>';
       if($name === "Student"){
-        $lowername = strtolower(str_replace(" ", "", preg_replace("~\[.*\]~i", "", $key)));
-        echo '<td onclick="toggle_visibility(\''.$lowername.'-list\');">v</td>';
+        $lowername = strtolower(str_replace(" ", "", preg_replace("~\[.*\]~i", "", preg_replace("~[^A-Za-z]~", "", $key))));
+        echo '<td onclick="toggle_visibility_reason(\''.$lowername.'-list\');" title="Show All Bookings For '.preg_replace("~\[.*\]~i", "", $key).'" class="studentshowmorelink">v</td>';
         echo '</tr>';
-        echo "<tr id=\"".$lowername."-list\" style=\"display:none;\"><td colspan=\"4\"><ol>";
         foreach ($reasonlist as $person => $reason){
-            if($reasonlistppl[$person] == $key)
-                echo "<li>".$reason."</li>";
+            if($reasonlistppl[$person] == $key){
+               preg_match("~([^\[]+)\[([^\]]+)\]\[([^\]]+)\]\[([^\]]+)\]~", $reason, $matchedreasons);
+               echo '<tr style="display:none;font-size:90%;" colspan="2" class="'.$lowername.'-list" title="Booking on '.$matchedreasons[2].' from '.$matchedreasons[3].' in '.$matchedreasons[4].'"><td colspan="2">'.$matchedreasons[1].' ('.$matchedreasons[4].')</td><td colspan="2" style="font-weight:none;">'.nicetime($matchedreasons[2].substr($matchedreasons[3], -6)).'</td></tr>';
             }
-        echo "</ol></td></tr>";
+         }
       }
       if($i == 20 && count($array) > 20)
         echo '<tr onclick="toggle_visibility(\''.$name.'div\');this.style.display=\'none\';" onmouseover="this.style.textDecoration=\'underline\'" style="color:blue;" class="button" ><td class="landscape" colspan="3">Show All '.count($array).' '.$name.'s</td><td colspan="2" class="portrait" style="display:none;">Show All '.count($array).' '.$name.'s</td></tr></table><span id="'.$name.'div" style="display:none;">'.$table;
@@ -334,16 +335,6 @@ echo '</div><div style="float:left;width:33%;">';
 leaderboard("Room", $roomlist, $roomlistnum, $tablestartleader, $totalbookings);
 leaderboard("Date", $datelist, $datelistnum, $tablestartleader, $totalbookings);
 echo '</div></div>';
-
-/* Reasons
-echo "
-<!-- 
-";$arrayreasons = array_count_values(array_map('strtolower', $reasonlist));
-arsort($arrayreasons);
-print_r($arrayreasons);
-echo " -->
-";
- End Reasons*/
 
 //TIMING
    $mtime = microtime();
